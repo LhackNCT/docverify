@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Instance axios configurée pour le backend Laravel + Sanctum
 const api = axios.create({
-baseURL: 'http://192.168.1.115:8000/api',
+baseURL: 'http://localhost:8000/api',
   withCredentials: true, // nécessaire pour Sanctum (cookies CSRF)
   headers: {
     'Accept': 'application/json',

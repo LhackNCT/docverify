@@ -13,28 +13,22 @@ class HashService
             throw new \RuntimeException('Fichier temporaire introuvable pour le calcul du hash.');
         }
 
-        $realPath = realpath($path);
-        if ($realPath === false || !is_file($realPath)) {
-            throw new \RuntimeException('Chemin de fichier invalide pour le calcul du hash.');
-        }
-
-        // Calcul en stream pour limiter l’usage mémoire
-        $ctx = hash_init('sha256');
-        $handle = fopen($realPath, 'rb');
+        $ctx    = hash_init('sha256');
+        $handle = fopen($path, 'rb');
         if ($handle === false) {
-            throw new \RuntimeException('Impossible d’ouvrir le fichier pour calculer le hash.');
+            throw new \RuntimeException('Impossible d\'ouvrir le fichier pour calculer le hash.');
         }
 
-        while (!feof($handle)) {
-            $chunk = fread($handle, 1024 * 1024); // 1MB
-            if ($chunk === false) {
-                break;
+        try {
+            while (!feof($handle)) {
+                $chunk = fread($handle, 1024 * 1024);
+                if ($chunk === false) break;
+                hash_update($ctx, $chunk);
             }
-            hash_update($ctx, $chunk);
+        } finally {
+            fclose($handle);
         }
-        fclose($handle);
 
         return hash_final($ctx);
     }
 }
-

@@ -6,17 +6,14 @@ use App\Models\Document;
 use App\Models\Notification;
 use App\Models\User;
 use App\Models\Verification;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
 class AdminController extends Controller
 {
-    /**
-     * Met à jour le profil de l'admin connecté.
-     * PUT /api/admin/profil
-     */
-    public function updateProfil(Request $request)
+    public function updateProfil(Request $request): JsonResponse
     {
         $data = $request->validate([
             'nom'       => ['required', 'string', 'max:100'],
@@ -30,11 +27,7 @@ class AdminController extends Controller
         return response()->json($request->user()->fresh());
     }
 
-    /**
-     * Change le mot de passe de l'admin connecté.
-     * PUT /api/admin/password
-     */
-    public function updatePassword(Request $request)
+    public function updatePassword(Request $request): JsonResponse
     {
         $request->validate([
             'current'               => ['required', 'string'],
@@ -55,11 +48,7 @@ class AdminController extends Controller
         return response()->json(['message' => 'Mot de passe modifié avec succès.']);
     }
 
-    /**
-     * Retourne les notifications de l'admin connecté.
-     * GET /api/admin/notifications
-     */
-    public function notifications(Request $request)
+    public function notifications(Request $request): JsonResponse
     {
         $notifs = Notification::where('admin_id', $request->user()->id)
             ->with('demande.user:id,nom,prenom,nom_institution')
@@ -73,11 +62,7 @@ class AdminController extends Controller
         ]);
     }
 
-    /**
-     * Marque toutes les notifications de l'admin comme lues.
-     * PATCH /api/admin/notifications/mark-read
-     */
-    public function markNotificationsRead(Request $request)
+    public function markNotificationsRead(Request $request): JsonResponse
     {
         Notification::where('admin_id', $request->user()->id)
             ->where('lu', false)
@@ -86,24 +71,16 @@ class AdminController extends Controller
         return response()->json(['message' => 'Notifications marquées comme lues.']);
     }
 
-    /**
-     * Liste tous les admins.
-     * GET /api/admin/admins
-     */
-    public function indexAdmins()
+    public function indexAdmins(): JsonResponse
     {
-        $admins = User::where('role', 'admin')
-            ->latest()
-            ->get(['id', 'nom', 'prenom', 'email', 'telephone', 'is_active', 'created_at', 'last_login_at']);
-
-        return response()->json($admins);
+        return response()->json(
+            User::where('role', 'admin')
+                ->latest()
+                ->get(['id', 'nom', 'prenom', 'email', 'telephone', 'is_active', 'created_at', 'last_login_at'])
+        );
     }
 
-    /**
-     * Crée un nouveau compte admin.
-     * POST /api/admin/admins
-     */
-    public function createAdmin(Request $request)
+    public function createAdmin(Request $request): JsonResponse
     {
         $data = $request->validate([
             'nom'       => ['required', 'string', 'max:100'],
@@ -126,24 +103,16 @@ class AdminController extends Controller
         return response()->json($admin, 201);
     }
 
-    /**
-     * Liste tous les émetteurs.
-     * GET /api/admin/emetteurs
-     */
-    public function indexEmetteurs()
+    public function indexEmetteurs(): JsonResponse
     {
-        $emetteurs = User::where('role', 'emetteur')
-            ->latest()
-            ->get(['id', 'nom', 'prenom', 'email', 'telephone', 'nom_institution', 'type_institution', 'is_active', 'is_certified', 'created_at', 'last_login_at']);
-
-        return response()->json($emetteurs);
+        return response()->json(
+            User::where('role', 'emetteur')
+                ->latest()
+                ->get(['id', 'nom', 'prenom', 'email', 'telephone', 'nom_institution', 'type_institution', 'is_active', 'is_certified', 'created_at', 'last_login_at'])
+        );
     }
 
-    /**
-     * Crée un nouveau compte émetteur (par l'admin).
-     * POST /api/admin/emetteurs
-     */
-    public function createEmetteur(Request $request)
+    public function createEmetteur(Request $request): JsonResponse
     {
         $data = $request->validate([
             'nom'              => ['required', 'string', 'max:100'],
@@ -174,11 +143,7 @@ class AdminController extends Controller
         return response()->json($user, 201);
     }
 
-    /**
-     * Modifie un compte émetteur existant.
-     * PUT /api/admin/emetteurs/{user}
-     */
-    public function updateEmetteur(Request $request, User $user)
+    public function updateEmetteur(Request $request, User $user): JsonResponse
     {
         if ($user->role !== 'emetteur') {
             return response()->json(['message' => 'Action non autorisée.'], 403);
@@ -199,17 +164,14 @@ class AdminController extends Controller
         return response()->json($user->fresh());
     }
 
-    /**
-     * Active ou désactive un compte émetteur.
-     * PATCH /api/admin/emetteurs/{user}/toggle
-     */
-    public function toggleActive(User $user)
+    public function toggleActive(User $user): JsonResponse
     {
         if ($user->role !== 'emetteur') {
             return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $user->update(['is_active' => !$user->is_active]);
+        $user->refresh();
 
         return response()->json([
             'message'   => 'Compte ' . ($user->is_active ? 'activé' : 'désactivé') . ' avec succès.',
@@ -217,11 +179,7 @@ class AdminController extends Controller
         ]);
     }
 
-    /**
-     * Certifie un émetteur et approuve sa demande en attente.
-     * PATCH /api/admin/emetteurs/{user}/certify
-     */
-    public function certifyEmetteur(Request $request, User $user)
+    public function certifyEmetteur(Request $request, User $user): JsonResponse
     {
         if ($user->role !== 'emetteur') {
             return response()->json(['message' => 'Action non autorisée.'], 403);
@@ -252,11 +210,7 @@ class AdminController extends Controller
         return response()->json(['message' => 'Émetteur certifié avec succès.', 'is_certified' => true]);
     }
 
-    /**
-     * Révoque la certification d'un émetteur.
-     * PATCH /api/admin/emetteurs/{user}/revoke
-     */
-    public function revokeEmetteurCertification(User $user)
+    public function revokeEmetteurCertification(User $user): JsonResponse
     {
         if ($user->role !== 'emetteur') {
             return response()->json(['message' => 'Action non autorisée.'], 403);
@@ -267,11 +221,7 @@ class AdminController extends Controller
         return response()->json(['message' => 'Certification révoquée.', 'is_certified' => false]);
     }
 
-    /**
-     * Affiche un émetteur spécifique avec ses demandes.
-     * GET /api/admin/emetteurs/{user}
-     */
-    public function showEmetteur(User $user)
+    public function showEmetteur(User $user): JsonResponse
     {
         if ($user->role !== 'emetteur') {
             return response()->json(['message' => 'Utilisateur introuvable.'], 404);
@@ -280,24 +230,16 @@ class AdminController extends Controller
         return response()->json($user->load('demandesCertifications'));
     }
 
-    /**
-     * Liste tous les validateurs.
-     * GET /api/admin/validateurs
-     */
-    public function indexValidateurs()
+    public function indexValidateurs(): JsonResponse
     {
-        $validateurs = User::where('role', 'validateur')
-            ->latest()
-            ->get(['id', 'nom', 'prenom', 'email', 'telephone', 'is_active', 'created_at', 'last_login_at']);
-
-        return response()->json($validateurs);
+        return response()->json(
+            User::where('role', 'validateur')
+                ->latest()
+                ->get(['id', 'nom', 'prenom', 'email', 'telephone', 'is_active', 'created_at', 'last_login_at'])
+        );
     }
 
-    /**
-     * Crée un compte validateur.
-     * POST /api/admin/validateurs
-     */
-    public function createValidateur(Request $request)
+    public function createValidateur(Request $request): JsonResponse
     {
         $data = $request->validate([
             'nom'       => ['required', 'string', 'max:100'],
@@ -320,17 +262,14 @@ class AdminController extends Controller
         return response()->json($validateur, 201);
     }
 
-    /**
-     * Active ou désactive un validateur.
-     * PATCH /api/admin/validateurs/{user}/toggle
-     */
-    public function toggleValidateur(User $user)
+    public function toggleValidateur(User $user): JsonResponse
     {
         if ($user->role !== 'validateur') {
             return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $user->update(['is_active' => !$user->is_active]);
+        $user->refresh();
 
         return response()->json([
             'message'   => 'Compte ' . ($user->is_active ? 'activé' : 'désactivé') . ' avec succès.',
@@ -338,27 +277,21 @@ class AdminController extends Controller
         ]);
     }
 
-    /**
-     * Statistiques globales pour le tableau de bord.
-     * GET /api/admin/stats
-     */
-    public function dashboardStats()
+    public function dashboardStats(): JsonResponse
     {
-        $expireCount = Document::where('statut', 'actif')
-            ->whereNotNull('date_expiration')
-            ->where('date_expiration', '<', now()->toDateString())
-            ->count();
+        $today = now()->toDateString();
 
         return response()->json([
             'documents' => [
                 'total'    => Document::count(),
                 'actifs'   => Document::where('statut', 'actif')
-                    ->where(function ($q) {
-                        $q->whereNull('date_expiration')
-                          ->orWhere('date_expiration', '>=', now()->toDateString());
-                    })->count(),
+                    ->where(fn($q) => $q->whereNull('date_expiration')->orWhere('date_expiration', '>=', $today))
+                    ->count(),
                 'revoques' => Document::where('statut', 'revoque')->count(),
-                'expires'  => $expireCount,
+                'expires'  => Document::where('statut', 'actif')
+                    ->whereNotNull('date_expiration')
+                    ->where('date_expiration', '<', $today)
+                    ->count(),
             ],
             'verifications' => [
                 'total' => Verification::count(),

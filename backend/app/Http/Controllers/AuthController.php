@@ -3,31 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    /**
-     * Inscription d'un nouvel émetteur.
-     * Les admins sont créés uniquement en base, jamais via cette route.
-     */
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
         $data = $request->validate([
             'nom'              => ['required', 'string', 'max:100'],
             'prenom'           => ['required', 'string', 'max:100'],
             'email'            => ['required', 'email', 'unique:users,email'],
-            'password'         => [
-                'required', 'string', 'min:8', 'confirmed',
-                'regex:/[A-Z]/',
-                'regex:/[^a-zA-Z0-9]/',
-            ],
+            'password'         => ['required', 'string', 'min:8', 'confirmed', 'regex:/[A-Z]/', 'regex:/[^a-zA-Z0-9]/'],
             'telephone'        => ['nullable', 'string', 'max:20'],
             'nom_institution'  => ['required', 'string', 'max:255'],
             'type_institution' => ['required', 'string', 'max:100'],
@@ -35,8 +26,8 @@ class AuthController extends Controller
         ], [
             'nom_institution.required'  => 'Le nom de l\'institution est obligatoire.',
             'type_institution.required' => 'Le type d\'institution est obligatoire.',
-            'password.min'   => 'Le mot de passe doit contenir au moins 8 caractères.',
-            'password.regex' => 'Le mot de passe doit contenir au moins une majuscule et un caractère spécial.',
+            'password.min'              => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'password.regex'            => 'Le mot de passe doit contenir au moins une majuscule et un caractère spécial.',
         ]);
 
         $user = User::create([
@@ -50,21 +41,15 @@ class AuthController extends Controller
             'type_institution' => $data['type_institution'],
             'adresse'          => $data['adresse'] ?? null,
             'is_active'        => true,
-            'is_certified'     => false, // toujours en attente de validation admin
+            'is_certified'     => false,
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'user'  => $user,
-            'token' => $token,
-        ], 201);
+        return response()->json(['user' => $user, 'token' => $token], 201);
     }
 
-    /**
-     * Connexion — retourne un token Sanctum.
-     */
-    public function login(Request $request)
+    public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
             'email'    => ['required', 'email'],
@@ -83,40 +68,26 @@ class AuthController extends Controller
             return response()->json(['message' => 'Compte désactivé. Contactez l\'administrateur.'], 403);
         }
 
-        // Mise à jour de la dernière connexion
         $user->update(['last_login_at' => now()]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'user'  => $user,
-            'token' => $token,
-        ]);
+        return response()->json(['user' => $user, 'token' => $token]);
     }
 
-    /**
-     * Déconnexion — révoque le token courant.
-     */
-    public function logout(Request $request)
+    public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Déconnecté avec succès.']);
     }
 
-    /**
-     * Retourne l'utilisateur authentifié.
-     */
-    public function me(Request $request)
+    public function me(Request $request): JsonResponse
     {
         return response()->json($request->user());
     }
 
-    /**
-     * Changement de mot de passe pour utilisateur connecté.
-     * PUT /api/change-password
-     */
-    public function changePassword(Request $request)
+    public function changePassword(Request $request): JsonResponse
     {
         $request->validate([
             'current_password' => ['required', 'string'],
@@ -136,11 +107,7 @@ class AuthController extends Controller
         return response()->json(['message' => 'Mot de passe modifié avec succès.']);
     }
 
-    /**
-     * Envoie un lien de réinitialisation de mot de passe.
-     * POST /api/forgot-password
-     */
-    public function forgotPassword(Request $request)
+    public function forgotPassword(Request $request): JsonResponse
     {
         $request->validate(['email' => ['required', 'email']]);
 
@@ -153,11 +120,7 @@ class AuthController extends Controller
         return response()->json(['message' => 'Aucun compte ne correspond à cette adresse email.'], 422);
     }
 
-    /**
-     * Réinitialise le mot de passe via le token reçu par email.
-     * POST /api/reset-password
-     */
-    public function resetPassword(Request $request)
+    public function resetPassword(Request $request): JsonResponse
     {
         $request->validate([
             'token'    => ['required', 'string'],
@@ -175,6 +138,8 @@ class AuthController extends Controller
                 $user->forceFill(['password' => Hash::make($password)])
                      ->setRememberToken(Str::random(60));
                 $user->save();
+                // Révoquer tous les tokens existants après reset
+                $user->tokens()->delete();
             }
         );
 
